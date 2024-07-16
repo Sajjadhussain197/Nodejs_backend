@@ -10,16 +10,23 @@ import fs from 'fs'
     
     const uploadCloudinary=async (localfilepath)=>{
         try {
-            if(!localfilepath) return null;
+            if(!localfilepath){
+                console.log("no localfilepath")
+                return null;
+
+            } 
             
            const response= await cloudinary.uploader.upload(localfilepath,{
                 resource_type:"auto"
             })
             console.log("file is uploaded successfully", response.url)
+            
+        fs.unlinkSync(localfilepath)
             return response
         } catch (error) {
             
         fs.unlinkSync(localfilepath)
+        console.log(error,"file uploading to cloudinary is failed")
         return null;
             
         }

@@ -51,7 +51,7 @@ const userSchema = new Schema(
         timestamps: true
     }
 )
-userSchema.pre('save', async function(next) {
+userSchema.pre("save", async function(next) {
     if(!this.isModified("password")) return null
     this.password= bcrypt.hash(this.password, 10)
     next();
@@ -63,10 +63,10 @@ userSchema.pre('save', async function(next) {
 
   userSchema.methods.generateAccessToken =  function(){
    return jwt.sign({
-        _id:this.id,
+        _id:this._id,
         username:this.username,
         email:this.email,
-        fullName:this.fullNames
+        fullName:this.fullName
     },
     process.env.ACCESS_TOKEN_SECRET,
     {

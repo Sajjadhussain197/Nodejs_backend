@@ -10,10 +10,13 @@ const generateAccessTokenRefreshToken = async (userId)=>{
      const user= await User.findById(userId)
      const accessToken = user.generateAccessToken();
      const refreshToken = user.generateRefreshToken();
+     user.refreshToken = refreshToken
+        await user.save({ validateBeforeSave: false })
 
-     user.refreshToken = refreshToken;
-     await user.save({validateBeforeSave:false})
-     return {accessToken, refreshToken}
+        return {accessToken, refreshToken}
+
+
+
      
    } catch (error) {
     throw new ApiError(500,"something went wrong while generating refresh and access token")
@@ -50,7 +53,7 @@ const registerUser = asyncHandler(async (req,res)=>{
    if(req.files && Array.isArray(req.files.coverImage && req.files.coverImage.length > 0))
    {
 
-       const coverImageLocalPath = req.files?.coverImage[0]?.path;
+        coverImageLocalPath = req.files?.coverImage[0]?.path;
    }
 
 
@@ -114,18 +117,20 @@ const loginUser = asyncHandler(async (req, res)=>{
         }
         console.log(ispasswordValid)
 
-        const {accessToken, refreshToken} = generateAccessTokenRefreshToken(user._id)
-    
+        const {accessToken, refreshToken} =await generateAccessTokenRefreshToken(user._id)
+        
         const loggedInUser= await User.findById(user._id).select(
-            "-password, -refreshToken"
+            "-password -refreshToken"
     
         )
     
         const options = {
             httpOnly: true,
-            secure:false
+            secure: true
         }
-        return res.status(200).cookie("accessToken",accessToken, options).cookie("refreshToken",refreshToken,options)
+        return res.status(200)
+        .cookie("accessToken",accessToken, options)
+        .cookie("refreshToken",refreshToken,options)
         .json(
             new ApiResponse(
                 200,
@@ -133,6 +138,8 @@ const loginUser = asyncHandler(async (req, res)=>{
                 "User logged In Successfully"
         )
         )
+
+    
     } catch (error) {
         throw new ApiError(500, "User login failed")
         
@@ -144,9 +151,9 @@ const loginUser = asyncHandler(async (req, res)=>{
 
 const loggedOutUser = asyncHandler(async (req,res)=>{
     await User.findByIdAndUpdate(
-        req.user._id,
+       req.user._id,
         {
-            $set:{
+            $unset:{
                 refreshToken: undefined
             }
         },
@@ -160,7 +167,7 @@ const loggedOutUser = asyncHandler(async (req,res)=>{
         httpOnly: true,
         secure:false
     }
-
+    console.log(req.user._id) 
     return res.status(200)
             .clearCookie("accessToken", options)
             .clearCookie("refreshToken", options)
@@ -169,6 +176,121 @@ const loggedOutUser = asyncHandler(async (req,res)=>{
             )
             
 
+})
+
+const changePassword = asyncHandler(async (req,res)=>{
+    try {
+        const {oldPassword, newPassword} = req.body
+        
+        const user = await User.findById(req.user?._id)
+
+        const isPasswordCorrect = user.isPasswordCorrect(oldPassword);
+        if (!isPasswordCorrect) {
+            throw new ApiError(401, "Password is not correct")
+            
+        }
+
+        user.password = newPassword;
+        user.save({ validateBeforeSave: false})
+        res.status(200)
+        .json(200, {},"Password changed Successfully")
+
+
+        
+    } catch (error) {
+        
+    }
+})
+
+const getCurrentUser = asyncHandler( async (req, res)=>{
+    res.status(200)
+    .json(200,req.user, " current User fetched successfully")
+})
+
+const updateAccountDetails = asyncHandler(async (req, res)=>{
+    try {
+        const {email, fullName}= req.body;
+        if (!email || !fullName) {
+            throw new ApiError(400, "All fields are required")
+            
+        }
+
+        const user = await User.findByIdAndUpdate(req.user?._id,
+            {
+                $set:{
+                    fullName,
+                    email: email
+                }
+            },
+            {new: true}
+        ).select("-password")
+        res.status(200)
+        .json(new ApiResponse(200,user, "account details updated successfully"))
+        
+    } catch (error) {
+        
+    }
+
+})
+
+const updateUserAvatar = asyncHandler(async (req, res)=>{
+    try {
+        const avatarLocalPath = req.file?.path;
+        if (!avatarLocalPath) {
+            throw new ApiError(400, "Avatar File is missing")
+            }
+
+        const avatar = await uploadCloudinary(avatarLocalPath);
+        if (!avatar.url) {
+            throw new ApiError(400, "Error while uploading Cloudinary")
+        }
+
+
+        const user = await User.findByIdAndUpdate(req.user?._id,
+            {
+                $set:{
+                    avatar: avatar.url
+                }
+            },
+            {new: true}
+        ).select("-password")
+        
+        return res.status(200)
+        .json(new ApiResponse(200,user, "User avatar image is updated successfully"))
+        
+    } catch (error) {
+        
+    }
+})
+
+const updateUserCoverImage = asyncHandler(async (req, res)=>{
+    try {
+        const coverImageLocalPath = req.file?.path;
+        if (!coverImageLocalPath) {
+            throw new ApiError(400, "coverImage  File is missing")
+            }
+
+        const coverImage = await uploadCloudinary(coverImageLocalPath);
+        if (!coverImage.url) {
+            throw new ApiError(400, "Error while uploading Cloudinary")
+        }
+
+
+        const user = await User.findByIdAndUpdate(req.user?._id,
+            {
+                $set:{
+                    coverImage: coverImage.url
+                }
+            },
+            {new: true}
+        ).select("-password")
+        
+        return res.status(200)
+        .json(new ApiResponse(200,user, "User cover image is updated successfully"))
+        
+    } catch (error) {
+        
+    }
 })
 
 
@@ -180,6 +302,12 @@ const loggedOutUser = asyncHandler(async (req,res)=>{
 export { 
     registerUser,
     loginUser,
-    loggedOutUser
+    loggedOutUser,
+    changePassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateUserCoverImage
+
  } 
 

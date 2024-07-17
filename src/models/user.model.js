@@ -51,15 +51,38 @@ const userSchema = new Schema(
         timestamps: true
     }
 )
-userSchema.pre("save", async function(next) {
-    if(!this.isModified("password")) return null
-    this.password= bcrypt.hash(this.password, 10)
-    next();
-  });
 
-  userSchema.methods.isPasswordCorret= async function(password){
-    bcrypt.compare(password,this.password)
-  };
+  userSchema.pre('save', async function(next) {
+    try {
+        // Only hash the password if it's modified or new
+        if (!this.isModified('password')) {
+            return next();
+        }
+
+        // Hash the password with bcrypt
+        const hashedPassword = await bcrypt.hash(this.password, 10);
+        this.password = hashedPassword;
+
+        next();
+    } catch (error) {
+        next(error); // Pass the error to Mongoose's middleware chain
+    }
+});
+
+
+  userSchema.methods.isPasswordCorrect = async function(password) {
+    try {
+
+
+        // Compare password with hashed password stored in the database
+        const isMatch = await bcrypt.compare(password, this.password);
+        console.log(isMatch)
+
+        return isMatch;
+    } catch (error) {
+        throw error;
+    }
+};
 
   userSchema.methods.generateAccessToken =  function(){
    return jwt.sign({
